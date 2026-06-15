@@ -17,7 +17,7 @@ export const metadata = {
   description: "Découvrir, créer et réserver des événements",
 };
 
-export default function RootLayout({ children }) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
