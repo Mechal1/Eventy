@@ -29,8 +29,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const { user } = useAuth()
   const router = useRouter()
 
-  useEffect(() => { fetchEvent() }, [])
-
   const fetchEvent = async () => {
     try {
       const response = await api.get(`/api/events/${id}`)
@@ -41,6 +39,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       setLoading(false)
     }
   }
+  
+  useEffect(() => { fetchEvent() }, [])
+
+  
 
   const handleBook = async () => {
     if (!user) { router.push('/login'); return }
@@ -49,7 +51,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     try {
       await api.post(`/api/events/${id}/book`, {userId: user!.uid})
       setBooked(true)
-      setEvent((prev: any) => ({ ...prev, bookedCount: (prev.bookedCount || 0) + 1 }))
+      setEvent((prev: any) => ({ ...prev, reservationsCount: (prev.reservationsCount || 0) + 1 }))
     } /*catch (err) {
       setError('Erreur lors de la réservation. Réessayez.')
     }*/ catch (err: any) {
@@ -74,10 +76,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   const cat = event.category || 'Music'
   const colors = CATEGORY_COLORS[cat] || CATEGORY_COLORS.Music
-  const bookedCount = event.bookedCount || 0
-  const capacity = event.capacity || 0
-  //-dester-const spotsLeft = capacity - bookedCount
-  const spotsLeft = capacity === 0 ? -1 : capacity - bookedCount
+  const bookedCount = event.reservationsCount || 0
+  const capacity = event.maxCapacity || 0
+  const spotsLeft = capacity - bookedCount
+  //const spotsLeft = capacity === 0 ? -1 : capacity - bookedCount
   const percent = capacity > 0 ? Math.round((bookedCount / capacity) * 100) : 0
   const organizerName = event.organizerName ||
     (event.organizer?.firstName ? `${event.organizer.firstName} ${event.organizer.lastName}` : 'Organisateur')

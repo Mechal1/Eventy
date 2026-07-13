@@ -20,6 +20,14 @@ interface Profile {
   role: string
 }
 
+type ApplicationStatus = 'none' | 'pending' | 'approved' | 'declined'
+
+interface OrganizerApplication {
+  id?: string
+  status: ApplicationStatus
+  message?: string
+}
+
 export default function ProfilePage() {
   const { user, logout, loading } = useAuth()
   const router = useRouter()
@@ -32,11 +40,31 @@ export default function ProfilePage() {
   const [editLastName, setEditLastName] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // --- Organizer application state ---
+  const [application, setApplication] = useState<OrganizerApplication>({ status: 'none' })
+  const [loadingApplication, setLoadingApplication] = useState(true)
+  const [applying, setApplying] = useState(false)
+  const [showApplyModal, setShowApplyModal] = useState(false)
+  const [applyEmail, setApplyEmail] = useState('')
+  const [applyPhone, setApplyPhone] = useState('')
+  const [applyOrgName, setApplyOrgName] = useState('')
+  const [applyOrgType, setApplyOrgType] = useState('')
+  const [acceptTerms, setAcceptTerms] = useState(false)
+  const [applyError, setApplyError] = useState('')
+
+  const ORG_TYPES = [
+    { value: 'individual', label: 'Particulier' },
+    { value: 'association', label: 'Association' },
+    { value: 'company', label: 'Entreprise' },
+    { value: 'other', label: 'Autre' },
+  ]
+
   useEffect(() => {
     if (loading) return
     if (!user) { router.push('/login'); return }
     fetchProfile()
     fetchBookings()
+    fetchOrganizerApplication()
   }, [user, loading])
 
   const fetchProfile = async () => {
@@ -56,6 +84,27 @@ export default function ProfilePage() {
       console.error('Erreur chargement bookings', err)
     } finally {
       setLoadingData(false)
+    }
+  }
+
+  // GET /api/become-organizer/user/{userId} — dernière candidature de l'utilisateur
+  const fetchOrganizerApplication = async () => {
+    try {
+      const response = await api.get(`/api/become-organizer/user/${user!.uid}`)
+      const data = response.data.data
+      if (data) {
+        setApplication({ id: data.id, status: data.status || 'pending', message: data.message })
+      } else {
+        setApplication({ status: 'none' })
+      }
+    } catch (err: any) {
+      // 404 = aucune candidature existante, ce n'est pas une vraie erreur
+      if (err?.response?.status !== 404) {
+        console.error('Erreur chargement candidature organisateur', err)
+      }
+      setApplication({ status: 'none' })
+    } finally {
+      setLoadingApplication(false)
     }
   }
 
@@ -90,6 +139,50 @@ export default function ProfilePage() {
       console.error('Erreur modification', err)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const openApplyModal = () => {
+    setApplyEmail(profile?.email || user?.email || '')
+    setApplyPhone('')
+    setApplyOrgName('')
+    setApplyOrgType('')
+    setAcceptTerms(false)
+    setApplyError('')
+    setShowApplyModal(true)
+  }
+
+  const isApplyFormValid =
+    applyEmail.trim() !== '' &&
+    applyPhone.trim() !== '' &&
+    applyOrgName.trim() !== '' &&
+    applyOrgType !== '' &&
+    acceptTerms
+
+  // POST /api/become-organizer/ — soumettre une candidature
+  const handleSubmitApplication = async () => {
+    if (!isApplyFormValid) {
+      setApplyError('Merci de remplir tous les champs et d’accepter les conditions.')
+      return
+    }
+    setApplyError('')
+    setApplying(true)
+    try {
+      const response = await api.post(`/api/become-organizer/`, {
+        userId: user!.uid,
+        email: applyEmail,
+        phone: applyPhone,
+        organizationName: applyOrgName,
+        organizationType: applyOrgType,
+      })
+      const data = response.data?.data
+      setApplication({ id: data?.id, status: 'pending' })
+      setShowApplyModal(false)
+    } catch (err) {
+      console.error('Erreur envoi candidature organisateur', err)
+      setApplyError('Une erreur est survenue, réessaie plus tard.')
+    } finally {
+      setApplying(false)
     }
   }
 
@@ -159,9 +252,37 @@ export default function ProfilePage() {
             ))}
           </div>
 
-          {role !== 'organizer' && (
-            <div style={{ textAlign: 'center', fontSize: '11px', color: '#0C6B54', cursor: 'pointer', padding: '6px 0', borderTop: '1px solid #E4E2DA', fontWeight: 500 }}>
-              Devenir organisateur →
+          {/* Bloc "Devenir organisateur" — dépend du rôle + statut de candidature */}
+          {role !== 'organizer' && !loadingApplication && (
+            <div style={{ borderTop: '1px solid #E4E2DA', paddingTop: '8px' }}>
+              {application.status === 'none' && (
+                <div
+                  onClick={openApplyModal}
+                  style={{ textAlign: 'center', fontSize: '11px', color: '#0C6B54', cursor: 'pointer', padding: '6px 0', fontWeight: 500 }}
+                >
+                  Devenir organisateur →
+                </div>
+              )}
+
+              {application.status === 'pending' && (
+                <div style={{ textAlign: 'center', fontSize: '11px', color: '#8A6D1D', padding: '6px 0', fontWeight: 500, background: '#FFF6E0', borderRadius: '8px' }}>
+                  Candidature en attente de validation
+                </div>
+              )}
+
+              {application.status === 'declined' && (
+                <div style={{ textAlign: 'center', padding: '6px 0' }}>
+                  <div style={{ fontSize: '11px', color: '#8C3018', fontWeight: 500, marginBottom: '4px' }}>
+                    Candidature refusée
+                  </div>
+                  <div
+                    onClick={openApplyModal}
+                    style={{ fontSize: '11px', color: '#0C6B54', cursor: 'pointer', fontWeight: 500 }}
+                  >
+                    Postuler à nouveau →
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -204,7 +325,7 @@ export default function ProfilePage() {
 
       </div>
 
-      {/* MODAL MODIFIER */}
+      {/* MODAL MODIFIER PROFIL */}
       {editing && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
           <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #E4E2DA', padding: '24px', width: '100%', maxWidth: '320px', margin: '0 18px' }}>
@@ -235,6 +356,99 @@ export default function ProfilePage() {
               <button onClick={handleSave} disabled={saving}
                 style={{ flex: 2, padding: '9px', borderRadius: '8px', fontSize: '12px', border: 'none', background: '#0C6B54', color: '#fff', cursor: 'pointer', opacity: saving ? 0.5 : 1 }}>
                 {saving ? 'Enregistrement...' : 'Enregistrer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DEVENIR ORGANISATEUR */}
+      {showApplyModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+          <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #E4E2DA', padding: '24px', width: '100%', maxWidth: '380px', margin: '0 18px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#1A1A18', marginBottom: '6px' }}>
+              Devenir organisateur
+            </h2>
+            <p style={{ fontSize: '11px', color: '#7A7A74', marginBottom: '16px' }}>
+              Remplis ce formulaire pour soumettre ta candidature. Elle sera examinée par un administrateur.
+            </p>
+
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 500, color: '#4A4A45', display: 'block', marginBottom: '4px' }}>Email de contact</label>
+              <input
+                type="email"
+                value={applyEmail}
+                onChange={e => setApplyEmail(e.target.value)}
+                placeholder="contact@exemple.com"
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', fontSize: '12px', border: '1px solid #E4E2DA', color: '#1A1A18', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 500, color: '#4A4A45', display: 'block', marginBottom: '4px' }}>Téléphone</label>
+              <input
+                type="tel"
+                value={applyPhone}
+                onChange={e => setApplyPhone(e.target.value)}
+                placeholder="06 12 34 56 78"
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', fontSize: '12px', border: '1px solid #E4E2DA', color: '#1A1A18', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 500, color: '#4A4A45', display: 'block', marginBottom: '4px' }}>Nom de l'organisation</label>
+              <input
+                value={applyOrgName}
+                onChange={e => setApplyOrgName(e.target.value)}
+                placeholder="Ex : Casa Events"
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', fontSize: '12px', border: '1px solid #E4E2DA', color: '#1A1A18', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 500, color: '#4A4A45', display: 'block', marginBottom: '4px' }}>Type d'organisation</label>
+              <select
+                value={applyOrgType}
+                onChange={e => setApplyOrgType(e.target.value)}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', fontSize: '12px', border: '1px solid #E4E2DA', color: applyOrgType ? '#1A1A18' : '#9A9A94', outline: 'none', boxSizing: 'border-box', background: '#fff' }}
+              >
+                <option value="" disabled>Sélectionner un type</option>
+                {ORG_TYPES.map(t => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '14px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={acceptTerms}
+                onChange={e => setAcceptTerms(e.target.checked)}
+                style={{ marginTop: '2px', width: '14px', height: '14px', accentColor: '#0C6B54', cursor: 'pointer', flexShrink: 0 }}
+              />
+              <span style={{ fontSize: '11px', color: '#4A4A45', lineHeight: 1.4 }}>
+                J'accepte les{' '}
+                <a href="/cgu" target="_blank" rel="noopener noreferrer" style={{ color: '#0C6B54', textDecoration: 'underline' }}>
+                  conditions générales
+                </a>{' '}
+                et la charte des organisateurs.
+              </span>
+            </label>
+
+            {applyError && (
+              <div style={{ fontSize: '11px', color: '#8C3018', marginBottom: '10px' }}>
+                {applyError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setShowApplyModal(false)}
+                style={{ flex: 1, padding: '9px', borderRadius: '8px', fontSize: '12px', border: '1px solid #E4E2DA', background: '#fff', color: '#1A1A18', cursor: 'pointer' }}>
+                Annuler
+              </button>
+              <button onClick={handleSubmitApplication} disabled={applying || !isApplyFormValid}
+                style={{ flex: 2, padding: '9px', borderRadius: '8px', fontSize: '12px', border: 'none', background: '#0C6B54', color: '#fff', cursor: 'pointer', opacity: (applying || !isApplyFormValid) ? 0.5 : 1 }}>
+                {applying ? 'Envoi...' : 'Envoyer la candidature'}
               </button>
             </div>
           </div>

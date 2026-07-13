@@ -1,6 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { use } from 'react'
+import { useState, useEffect, use, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import api from '@/lib/api'
@@ -23,26 +22,27 @@ export default function AttendeesPage({ params }: { params: Promise<{ id: string
   const [event, setEvent] = useState<any>(null)
   const [loadingData, setLoadingData] = useState(true)
 
-  useEffect(() => {
-    if (loading) return
-    if (!user) { router.push('/login'); return }
-    fetchData()
-  }, [user, loading])
-
-  const fetchData = async () => {
+  // ✅ Fix : fetchData déclarée AVANT useEffect
+  const fetchData = useCallback(async () => {
     try {
       const [eventRes, attendeesRes] = await Promise.all([
         api.get(`/api/events/${id}`),
         api.get(`/api/events/${id}/attendees`)
       ])
-      setEvent(eventRes.data.data)
-      setAttendees(attendeesRes.data.data || [])
+      setEvent(eventRes.data.data || eventRes.data)
+      setAttendees(attendeesRes.data.data || attendeesRes.data || [])
     } catch (err) {
       console.error('Erreur chargement', err)
     } finally {
       setLoadingData(false)
     }
-  }
+  }, [id])
+
+  useEffect(() => {
+    if (loading) return
+    if (!user) { router.push('/login'); return }
+    fetchData()
+  }, [user, loading, fetchData])
 
   if (loading || loadingData) return (
     <div style={{ backgroundColor: '#EFEDE6', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -58,11 +58,11 @@ export default function AttendeesPage({ params }: { params: Promise<{ id: string
 
       <div style={{ maxWidth: '680px', margin: '0 auto', padding: '20px 18px' }}>
 
-        <Link href="/events/manage" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: '#7A7A74', marginBottom: '14px', textDecoration: 'none' }}>
+        <Link href="/manage" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: '#7A7A74', marginBottom: '14px', textDecoration: 'none' }}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
             <path d="M10 3L5 8l5 5"/>
           </svg>
-          Mes événements
+          Mes evenements
         </Link>
 
         <h1 style={{ fontSize: '20px', fontWeight: 600, color: '#1A1A18', marginBottom: '2px' }}>
@@ -78,8 +78,8 @@ export default function AttendeesPage({ params }: { params: Promise<{ id: string
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '14px' }}>
           {[
             { n: attendees.length, l: 'Inscrits' },
-            { n: (event?.maxCapacity || 0) - attendees.length, l: 'Restantes' },
-            { n: event?.maxCapacity || 0, l: 'Capacité' },
+            { n: (event?.capacity || event?.maxCapacity || 0) - attendees.length, l: 'Restantes' },
+            { n: event?.capacity || event?.maxCapacity || 0, l: 'Capacite' },
           ].map((s, i) => (
             <div key={i} style={{ background: '#fff', borderRadius: '10px', border: '1px solid #E4E2DA', padding: '12px', textAlign: 'center' }}>
               <div style={{ fontSize: '22px', fontWeight: 600, color: '#1A1A18' }}>{s.n}</div>

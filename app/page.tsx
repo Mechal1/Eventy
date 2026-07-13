@@ -26,8 +26,8 @@ interface Event {
   category: string
   date: string
   city: string
-  capacity: number
-  bookedCount: number
+  maxCapacity: number
+  reservationsCount: number
 }
 
 export default function HomePage() {
@@ -100,7 +100,7 @@ export default function HomePage() {
             {events.map((event) => {
               const cat = event.category || 'Music'
               const colors = CATEGORY_COLORS[cat] || CATEGORY_COLORS.Music
-              const spotsLeft = (event.capacity || 0) - (event.bookedCount || 0)
+              const spotsLeft = (event.maxCapacity || 0) - (event.reservationsCount || 0)
               return (
                 <Link
                   href={'/events/' + event.id}
