@@ -89,7 +89,7 @@ const initials  = `${firstName[0] || ''}${lastName[0] || ''}`.toUpperCase() || '
                 }}>
                   {user.role === 'organizer' && (
                     <Link
-                      href="/events/manage"
+                      href="/dashboard"
                       onClick={() => setOpen(false)}
                       style={{
                         display: 'block',
@@ -99,7 +99,7 @@ const initials  = `${firstName[0] || ''}${lastName[0] || ''}`.toUpperCase() || '
                         textDecoration: 'none',
                         borderBottom: '1px solid #E4E2DA',
                       }}>
-                      Mes événements
+                      Dashboard
                     </Link>
                   )}
                   <Link
