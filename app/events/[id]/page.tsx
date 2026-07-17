@@ -84,6 +84,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const organizerName = event.organizerName ||
     (event.organizer?.firstName ? `${event.organizer.firstName} ${event.organizer.lastName}` : 'Organisateur')
 
+  // ✅ Vérifie si l'utilisateur connecté est l'organisateur de cet événement
+  const organizerId = event.organizerId || event.organizer?.id || event.organizer?.uid
+  const isOrganizer = !!user && !!organizerId && user.uid === organizerId
+
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh' }}>
       <Navbar variant="full" />
@@ -177,7 +181,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             </div>
           </div>
 
-          {booked ? (
+          {isOrganizer ? (
+            // ✅ L'organisateur ne peut pas réserver son propre événement
+            <div style={{ padding: '9px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 500, backgroundColor: '#F6F5F0', color: '#7A7A74', border: '1px solid #E4E2DA' }}>
+              Vous êtes l'organisateur
+            </div>
+          ) : booked ? (
             <div style={{ padding: '9px 24px', borderRadius: '8px', fontSize: '13px', fontWeight: 500, backgroundColor: '#D6F0E8', color: '#0C6B54' }}>
               ✓ Réservé
             </div>
