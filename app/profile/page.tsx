@@ -35,6 +35,8 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loadingData, setLoadingData] = useState(true)
   const [cancelling, setCancelling] = useState<string | null>(null)
+  const [showCancelConfirm, setShowCancelConfirm] = useState<Booking | null>(null)
+  const [cancelledCount, setCancelledCount] = useState(0)
   const [editing, setEditing] = useState(false)
   const [editFirstName, setEditFirstName] = useState('')
   const [editLastName, setEditLastName] = useState('')
@@ -113,10 +115,12 @@ export default function ProfilePage() {
     try {
       await api.post(`/api/events/${eventId}/unbook`, { userId: user!.uid })
       setBookings(prev => prev.filter(b => b.id !== eventId))
+      setCancelledCount(prev => prev + 1)
     } catch (err) {
       console.error('Erreur annulation', err)
     } finally {
       setCancelling(null)
+      setShowCancelConfirm(null)
     }
   }
 
@@ -243,7 +247,7 @@ export default function ProfilePage() {
             {[
               { n: bookings.length, l: 'Réservations' },
               { n: bookings.filter(b => new Date(b.date) >= new Date()).length, l: 'À venir' },
-              { n: 0, l: 'Créés' },
+              { n: cancelledCount, l: 'Annulées' },
             ].map((s, i) => (
               <div key={i} style={{ background: '#F6F5F0', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
                 <div style={{ fontSize: '20px', fontWeight: 600, color: '#1A1A18' }}>{s.n}</div>
@@ -313,7 +317,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <button
-                  onClick={() => handleCancel(booking.id)}
+                  onClick={() => setShowCancelConfirm(booking)}
                   disabled={cancelling === booking.id}
                   style={{ padding: '5px 10px', borderRadius: '8px', fontSize: '11px', border: '1px solid #F0BDB1', background: '#FDEAE4', color: '#8C3018', cursor: 'pointer', opacity: cancelling === booking.id ? 0.5 : 1 }}>
                   {cancelling === booking.id ? '...' : 'Annuler'}
@@ -324,6 +328,36 @@ export default function ProfilePage() {
         </div>
 
       </div>
+
+      {/* MODAL CONFIRMATION ANNULATION */}
+      {showCancelConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60 }}>
+          <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #E4E2DA', padding: '24px', width: '100%', maxWidth: '320px', margin: '0 18px' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#1A1A18', marginBottom: '8px' }}>
+              Annuler la réservation ?
+            </h2>
+            <p style={{ fontSize: '12px', color: '#7A7A74', marginBottom: '18px', lineHeight: 1.5 }}>
+              Tu es sur le point d'annuler ta réservation pour{' '}
+              <strong style={{ color: '#1A1A18' }}>{showCancelConfirm.title}</strong>.
+              Cette action est irréversible.
+            </p>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setShowCancelConfirm(null)}
+                disabled={cancelling === showCancelConfirm.id}
+                style={{ flex: 1, padding: '9px', borderRadius: '8px', fontSize: '12px', border: '1px solid #E4E2DA', background: '#fff', color: '#1A1A18', cursor: 'pointer' }}>
+                Retour
+              </button>
+              <button
+                onClick={() => handleCancel(showCancelConfirm.id)}
+                disabled={cancelling === showCancelConfirm.id}
+                style={{ flex: 1, padding: '9px', borderRadius: '8px', fontSize: '12px', border: 'none', background: '#8C3018', color: '#fff', cursor: 'pointer', opacity: cancelling === showCancelConfirm.id ? 0.5 : 1 }}>
+                {cancelling === showCancelConfirm.id ? 'Annulation...' : 'Oui, annuler'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL MODIFIER PROFIL */}
       {editing && (

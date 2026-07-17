@@ -66,7 +66,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
         maxCapacity: parseInt(capacity),
         googleMapLocation,
       })
-      router.push('/events/manage')
+            router.back()
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Erreur lors de la modification. Réessayez.'
       setError(msg)

@@ -22,7 +22,6 @@ export default function CreateEventPage() {
   const [googleMapLocation, setGoogleMapLocation] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [imageFile, setImageFile] = useState<File | null>(null)
 
  useEffect(() => {
   if (loading) return
@@ -30,8 +29,7 @@ export default function CreateEventPage() {
   // if (user.role !== 'organizer') { router.push('/'); return }
 }, [user, loading])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    const handleSubmit = async (status: 'draft' | 'published') => {
     setError('')
     setSubmitting(true)
     try {
@@ -42,11 +40,11 @@ export default function CreateEventPage() {
             time,
             city,
             category,
-            maxCapacity: parseInt(capacity), // ← changé
+            maxCapacity: parseInt(capacity),
             googleMapLocation,
-            eventIcon: '🎉', // ← ajouté
+            eventIcon: '🎉',
             organizerId: user!.uid,
-
+            status,
       })
       router.push('/events/manage')
     } catch (err: any) {
@@ -93,7 +91,7 @@ if (!user) return null
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={(e) => e.preventDefault()}>
           <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #E4E2DA', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
             {/* Titre */}
@@ -210,54 +208,42 @@ if (!user) return null
                 style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', fontSize: '12px', border: '1px solid #E4E2DA', color: '#1A1A18', outline: 'none' }}
               />
             </div>
-            {/* cover Image*/}
-            <div>
-                <label style={{ fontSize: '11px', fontWeight: 500, color: '#4A4A45', display: 'block', marginBottom: '4px' }}>
-                    Image de couverture
-                </label>
-                <div
-                    onClick={() => document.getElementById('fileInput')?.click()}
-                    style={{ border: '1.5px dashed #E4E2DA', borderRadius: '8px', padding: '24px', textAlign: 'center', cursor: 'pointer' }}>
-                    <input
-                    id="fileInput"
-                    type="file"
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    
-                    onChange={e => {
-                        const file = e.target.files?.[0]
-                        if (file) setImageFile(file)
-                    }}
-                    />
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                    <svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="#7A7A74" strokeWidth="1.5">
-                        <path d="M10 13V3m0 0L6 7m4-4l4 4"/><path d="M3 14v1a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-1"/>
-                    </svg>
-                    <div style={{ fontSize: '11px', color: '#7A7A74' }}>Cliquez pour uploader ou glisser-déposer</div>
-                    <div style={{ fontSize: '10px', color: '#7A7A74' }}>PNG, JPG jusqu'à 5MB</div>
-                    </div>
-                </div>
-            </div>
-
-            {imageFile && (
-                <div style={{ fontSize: '11px', color: '#0C6B54', marginTop: '4px' }}>
-                    ✓ {imageFile.name}
-                </div>
-            )}
 
             {/* Boutons */}
             <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
                 <button
-                    type="button"
-                    disabled={submitting}
-                    style={{ flex: 1, padding: '10px', borderRadius: '8px', fontSize: '13px', fontWeight: 500, border: '1px solid #E4E2DA', background: '#fff', color: '#1A1A18', cursor: 'pointer' }}>
-                    Enregistrer brouillon
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => handleSubmit('draft')}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    border: '1px solid #E4E2DA',
+                    background: '#fff',
+                    color: '#1A1A18',
+                    cursor: submitting ? 'not-allowed' : 'pointer'
+                  }}>
+                  {submitting ? '...' : 'Enregistrer brouillon'}
                 </button>
                 <button
-                    type="submit"
-                    disabled={submitting}
-                    style={{ flex: 2, padding: '10px', borderRadius: '8px', fontSize: '13px', fontWeight: 500, border: 'none', background: submitting ? '#E4E2DA' : '#0C6B54', color: '#fff', cursor: submitting ? 'not-allowed' : 'pointer' }}>
-                    {submitting ? 'Publication...' : 'Publier l\'événement'}
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => handleSubmit('published')}
+                  style={{
+                    flex: 2,
+                    padding: '10px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    border: 'none',
+                    background: submitting ? '#E4E2DA' : '#0C6B54',
+                    color: '#fff',
+                    cursor: submitting ? 'not-allowed' : 'pointer'
+                  }}>
+                  {submitting ? 'Publication...' : "Publier l'événement"}
                 </button>
             </div>
 

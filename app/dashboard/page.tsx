@@ -14,8 +14,8 @@ interface OrganizerEvent {
   date: string
   city: string
   category: string
-  capacity: number
-  bookedCount: number
+  maxCapacity: number
+  reservationsCount: number
   status: 'published' | 'draft'
 }
 
@@ -25,6 +25,8 @@ export default function OrganizerDashboardPage() {
   const { user } = useAuth()
   const router = useRouter()
   const [events, setEvents] = useState<OrganizerEvent[]>([])
+  const [showCancelEventConfirm, setShowCancelEventConfirm] = useState<OrganizerEvent | null>(null)
+  const [cancellingEvent, setCancellingEvent] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchMyEvents() {
@@ -36,18 +38,26 @@ export default function OrganizerDashboardPage() {
 
   const publishedCount = events.filter(e => e.status === 'published').length
   const draftCount = events.filter(e => e.status === 'draft').length
-  const totalBookings = events.reduce((sum, e) => sum + e.bookedCount, 0)
+  const totalBookings = events.reduce((sum, e) => sum + e.reservationsCount, 0)
 
   async function handleCancelEvent(id: string) {
-    await api.patch(`/api/events/${id}`, { status: 'cancelled' })
-    setEvents(prev => prev.filter(e => e.id !== id))
+    setCancellingEvent(id)
+    try {
+      await api.put(`/api/events/${id}`, { status: 'cancelled' })
+      setEvents(prev => prev.filter(e => e.id !== id))
+    } catch (err) {
+      console.error('Erreur annulation événement', err)
+    } finally {
+      setCancellingEvent(null)
+      setShowCancelEventConfirm(null)
+    }
   }
 
   return (
     <div style={{ backgroundColor: '#EFEDE6', minHeight: '100vh' }}>
       <Navbar />
 
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px' }}>
+      <div style={{ maxWidth: '70%', margin: '0 auto', padding: '24px 16px' }}>
 
         <h1 style={{ fontSize: 20, fontWeight: 600, color: '#1A1A18', marginBottom: 2 }}>
           Bienvenue{user?.firstName ? `, ${user.firstName}` : ''}
@@ -79,18 +89,7 @@ export default function OrganizerDashboardPage() {
               </svg>
             }
           />
-          <ActionButton
-            label="Inscrits"
-            onClick={() => router.push('/events/attendees')}
-            icon={
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="6" cy="5" r="2.5" />
-                <path d="M1 14c0-3.3 2.2-5.5 5-5.5S11 10.7 11 14" />
-                <circle cx="12.5" cy="5.5" r="2" />
-                <path d="M11 13.5c0-1.7.7-3.2 2-4" />
-              </svg>
-            }
-          />
+         
         </div>
 
         {/* STATS */}
@@ -122,7 +121,9 @@ export default function OrganizerDashboardPage() {
 
         <div style={{ backgroundColor: '#fff', borderRadius: 14, border: '1px solid #E4E2DA', overflow: 'hidden' }}>
           {events.map((ev, i) => {
-            const pct = Math.round((ev.bookedCount / ev.capacity) * 100)
+            const pct = ev.maxCapacity > 0
+              ? Math.round((ev.reservationsCount / ev.maxCapacity) * 100)
+              : 0
             return (
               <div
                 key={ev.id}
@@ -139,7 +140,7 @@ export default function OrganizerDashboardPage() {
                     <div style={{ height: '100%', width: `${pct}%`, backgroundColor: '#1A9070', borderRadius: 2 }} />
                   </div>
                   <div style={{ fontSize: 10, color: '#7A7A74', marginTop: 3 }}>
-                    {ev.bookedCount} / {ev.capacity} réservés
+                    {ev.reservationsCount} / {ev.maxCapacity} réservés
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, marginLeft: 10 }}>
@@ -151,9 +152,9 @@ export default function OrganizerDashboardPage() {
                     {ev.status === 'published' ? 'Publié' : 'Brouillon'}
                   </span>
                   <div style={{ display: 'flex', gap: 5 }}>
-                    <IconButton onClick={() => router.push(`/events/attendees?id=${ev.id}`)} title="Voir les inscrits">👥</IconButton>
-                    <IconButton onClick={() => router.push(`/events/edit/${ev.id}`)} title="Modifier">✏️</IconButton>
-                    <IconButton onClick={() => handleCancelEvent(ev.id)} title="Annuler" danger>✕</IconButton>
+                    <IconButton onClick={() => router.push(`/events/${ev.id}/attendees`)} title="Voir les inscrits">👥</IconButton>
+                    <IconButton onClick={() => router.push(`/events/${ev.id}/edit`)} title="Modifier">✏️</IconButton>
+                    <IconButton onClick={() => setShowCancelEventConfirm(ev)} title="Annuler" danger>✕</IconButton>
                   </div>
                 </div>
               </div>
@@ -162,6 +163,36 @@ export default function OrganizerDashboardPage() {
         </div>
 
       </div>
+
+      {/* MODAL CONFIRMATION ANNULATION EVENEMENT */}
+      {showCancelEventConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60 }}>
+          <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #E4E2DA', padding: '24px', width: '100%', maxWidth: '320px', margin: '0 18px' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#1A1A18', marginBottom: '8px' }}>
+              Annuler l'événement ?
+            </h2>
+            <p style={{ fontSize: '12px', color: '#7A7A74', marginBottom: '18px', lineHeight: 1.5 }}>
+              Tu es sur le point d'annuler{' '}
+              <strong style={{ color: '#1A1A18' }}>{showCancelEventConfirm.title}</strong>.
+              Les participants inscrits seront informés et cette action est irréversible.
+            </p>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setShowCancelEventConfirm(null)}
+                disabled={cancellingEvent === showCancelEventConfirm.id}
+                style={{ flex: 1, padding: '9px', borderRadius: '8px', fontSize: '12px', border: '1px solid #E4E2DA', background: '#fff', color: '#1A1A18', cursor: 'pointer' }}>
+                Retour
+              </button>
+              <button
+                onClick={() => handleCancelEvent(showCancelEventConfirm.id)}
+                disabled={cancellingEvent === showCancelEventConfirm.id}
+                style={{ flex: 1, padding: '9px', borderRadius: '8px', fontSize: '12px', border: 'none', background: '#8C3018', color: '#fff', cursor: 'pointer', opacity: cancellingEvent === showCancelEventConfirm.id ? 0.5 : 1 }}>
+                {cancellingEvent === showCancelEventConfirm.id ? 'Annulation...' : "Oui, annuler"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

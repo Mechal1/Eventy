@@ -7,11 +7,24 @@ import Navbar from '@/components/Navbar'
 import Link from 'next/link'
 
 interface Attendee {
-  id: string
+  bookingId: string
+  userId: string
   firstName: string
   lastName: string
   email: string
   bookedAt: string
+  status?: string
+}
+
+const STATUS_STYLES: Record<string, { bg: string; color: string; label: string }> = {
+  confirmed: { bg: '#DFF3E8', color: '#2F9E63', label: 'Confirmed' },
+  pending:   { bg: '#FBEBD3', color: '#C7893A', label: 'Pending' },
+  cancelled: { bg: '#FBE3E1', color: '#D5645A', label: 'Cancelled' },
+}
+
+function getStatusStyle(status?: string) {
+  const key = (status || 'confirmed').toLowerCase()
+  return STATUS_STYLES[key] || STATUS_STYLES.confirmed
 }
 
 export default function AttendeesPage({ params }: { params: Promise<{ id: string }> }) {
@@ -25,12 +38,12 @@ export default function AttendeesPage({ params }: { params: Promise<{ id: string
   // ✅ Fix : fetchData déclarée AVANT useEffect
   const fetchData = useCallback(async () => {
     try {
-      const [eventRes, attendeesRes] = await Promise.all([
-        api.get(`/api/events/${id}`),
-        api.get(`/api/events/${id}/attendees`)
-      ])
-      setEvent(eventRes.data.data || eventRes.data)
-      setAttendees(attendeesRes.data.data || attendeesRes.data || [])
+      const eventRes = await api.get(`/api/events/${id}`)
+
+      const eventData = eventRes.data.data || eventRes.data
+
+      setEvent(eventData)
+      setAttendees(eventData.attendeesList || [])
     } catch (err) {
       console.error('Erreur chargement', err)
     } finally {
@@ -102,21 +115,38 @@ export default function AttendeesPage({ params }: { params: Promise<{ id: string
                   <th style={{ padding: '8px 12px', textAlign: 'left', color: '#7A7A74', fontWeight: 500 }}>Nom</th>
                   <th style={{ padding: '8px 12px', textAlign: 'left', color: '#7A7A74', fontWeight: 500 }}>Email</th>
                   <th style={{ padding: '8px 12px', textAlign: 'left', color: '#7A7A74', fontWeight: 500 }}>Inscrit le</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', color: '#7A7A74', fontWeight: 500 }}>Status</th>
                 </tr>
               </thead>
               <tbody>
-                {attendees.map((attendee, i) => (
-                  <tr key={attendee.id} style={{ borderBottom: i < attendees.length - 1 ? '1px solid #E4E2DA' : 'none' }}>
-                    <td style={{ padding: '10px 12px', color: '#7A7A74' }}>{i + 1}</td>
-                    <td style={{ padding: '10px 12px', color: '#1A1A18', fontWeight: 500 }}>
-                      {attendee.firstName} {attendee.lastName}
-                    </td>
-                    <td style={{ padding: '10px 12px', color: '#7A7A74' }}>{attendee.email}</td>
-                    <td style={{ padding: '10px 12px', color: '#7A7A74' }}>
-                      {attendee.bookedAt ? new Date(attendee.bookedAt).toLocaleDateString('fr-FR') : '-'}
-                    </td>
-                  </tr>
-                ))}
+                {attendees.map((attendee, i) => {
+                  const statusStyle = getStatusStyle(attendee.status)
+                  return (
+                    <tr key={attendee.bookingId} style={{ borderBottom: i < attendees.length - 1 ? '1px solid #E4E2DA' : 'none' }}>
+                      <td style={{ padding: '10px 12px', color: '#7A7A74' }}>{i + 1}</td>
+                      <td style={{ padding: '10px 12px', color: '#1A1A18', fontWeight: 500 }}>
+                        {attendee.firstName} {attendee.lastName}
+                      </td>
+                      <td style={{ padding: '10px 12px', color: '#7A7A74' }}>{attendee.email}</td>
+                      <td style={{ padding: '10px 12px', color: '#7A7A74' }}>
+                        {attendee.bookedAt ? new Date(attendee.bookedAt).toLocaleDateString('fr-FR') : '-'}
+                      </td>
+                      <td style={{ padding: '10px 12px' }}>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '3px 10px',
+                          borderRadius: '999px',
+                          fontSize: '10px',
+                          fontWeight: 500,
+                          background: statusStyle.bg,
+                          color: statusStyle.color,
+                        }}>
+                          {statusStyle.label}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           )}
